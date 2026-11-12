@@ -133,12 +133,32 @@ filtro_bandas = signal.butter(
 )
 
 # ------------------------------------------------------------
+# DISEÑO DEL FILTRO CHEBYSHEV TIPO I
+# ------------------------------------------------------------
+
+filtro_chebyshev = signal.cheby1(
+    4,                  # Orden del filtro
+    1,                  # Rizado máximo en banda de paso (dB)
+    20,                 # Frecuencia de corte (Hz)
+    btype="lowpass",
+    fs=frecuencia_muestreo,
+    output="sos"
+)
+
+# ------------------------------------------------------------
 # 2. APLICAR LOS FILTROS A LA SEÑAL RUIDOSA
 # ------------------------------------------------------------
 
 resultado_bajos = signal.sosfiltfilt(
     filtro_bajos, senal_ruidosa
 )
+
+# Aplicar el filtro Chebyshev
+resultado_chebyshev = signal.sosfiltfilt(
+    filtro_chebyshev,
+    senal_ruidosa
+)
+
 
 resultado_altos = signal.sosfiltfilt(
     filtro_altos, senal_ruidosa
@@ -201,23 +221,32 @@ print("Filtro FIR aplicado correctamente.")
 
 plt.figure(figsize=(12, 10))
 
-plt.subplot(3, 1, 1)
+plt.figure(figsize=(12, 12))
+
+plt.subplot(4, 1, 1)
 plt.plot(tiempo, resultado_bajos, color="blue")
-plt.title("Resultado del filtro pasa bajos (20 Hz)")
+plt.title("Filtro pasa bajos Butterworth (20 Hz)")
 plt.xlabel("Tiempo (segundos)")
 plt.ylabel("Amplitud")
 plt.grid()
 
-plt.subplot(3, 1, 2)
+plt.subplot(4, 1, 2)
 plt.plot(tiempo, resultado_altos, color="green")
-plt.title("Resultado del filtro pasa altos (80 Hz)")
+plt.title("Filtro pasa altos Butterworth (80 Hz)")
 plt.xlabel("Tiempo (segundos)")
 plt.ylabel("Amplitud")
 plt.grid()
 
-plt.subplot(3, 1, 3)
+plt.subplot(4, 1, 3)
 plt.plot(tiempo, resultado_bandas, color="purple")
-plt.title("Resultado del filtro pasa bandas (40-60 Hz)")
+plt.title("Filtro pasa bandas Butterworth (40-60 Hz)")
+plt.xlabel("Tiempo (segundos)")
+plt.ylabel("Amplitud")
+plt.grid()
+
+plt.subplot(4, 1, 4)
+plt.plot(tiempo, resultado_chebyshev, color="orange")
+plt.title("Filtro pasa bajos Chebyshev (20 Hz)")
 plt.xlabel("Tiempo (segundos)")
 plt.ylabel("Amplitud")
 plt.grid()
@@ -234,9 +263,10 @@ plt.figure(figsize=(12, 6))
 
 # Obtener la respuesta en frecuencia de cada filtro
 for filtro, nombre in [
-    (filtro_bajos, "Pasa bajos"),
-    (filtro_altos, "Pasa altos"),
-    (filtro_bandas, "Pasa bandas")
+    (filtro_bajos, "Pasa bajos Butterworth"),
+    (filtro_altos, "Pasa altos Butterworth"),
+    (filtro_bandas, "Pasa bandas Butterworth"),
+    (filtro_chebyshev, "Pasa bajos Chebyshev")
 ]:
 
     frecuencias, respuesta = signal.sosfreqz(
@@ -283,6 +313,55 @@ plt.grid()
 
 plt.tight_layout()
 plt.savefig("respuesta_frecuencia.png", dpi=300)
+plt.show()
+# ------------------------------------------------------------
+# 5. ANALIZAR EL ESPECTRO DE LAS SEÑALES
+# ------------------------------------------------------------
+
+# Calcular la Transformada Rápida de Fourier
+def obtener_espectro(senal):
+
+    espectro = np.fft.rfft(senal)
+
+    frecuencias = np.fft.rfftfreq(
+        len(senal),
+        d=1 / frecuencia_muestreo
+    )
+
+    amplitud = 2 * np.abs(espectro) / len(senal)
+
+    return frecuencias, amplitud
+
+
+# Obtener el espectro de la señal original y filtradas
+plt.figure(figsize=(12, 7))
+
+for nombre, senal in [
+    ("Señal con ruido", senal_ruidosa),
+    ("Butterworth pasa bajos", resultado_bajos),
+    ("Butterworth pasa altos", resultado_altos),
+    ("Butterworth pasa bandas", resultado_bandas),
+    ("Chebyshev pasa bajos", resultado_chebyshev),
+    ("FIR pasa bajos", resultado_fir)
+]:
+
+    frecuencias, amplitud = obtener_espectro(senal)
+
+    plt.plot(
+        frecuencias,
+        amplitud,
+        label=nombre
+    )
+
+plt.title("Espectro de frecuencias antes y después del filtrado")
+plt.xlabel("Frecuencia (Hz)")
+plt.ylabel("Amplitud")
+plt.xlim(0, 200)
+plt.legend()
+plt.grid()
+
+plt.tight_layout()
+plt.savefig("espectro_frecuencias.png", dpi=300)
 plt.show()
 
 # ------------------------------------------------------------
@@ -340,9 +419,10 @@ def medir_frecuencia(senal, frecuencia_objetivo):
 senales = {
     "Original": senal_original,
     "Con ruido": senal_ruidosa,
-    "Pasa bajos IIR": resultado_bajos,
-    "Pasa altos IIR": resultado_altos,
-    "Pasa bandas IIR": resultado_bandas,
+    "Pasa bajos Butterworth": resultado_bajos,
+    "Pasa altos Butterworth": resultado_altos,
+    "Pasa bandas Butterworth": resultado_bandas,
+    "Pasa bajos Chebyshev": resultado_chebyshev,
     "Pasa bajos FIR": resultado_fir
 }
 
